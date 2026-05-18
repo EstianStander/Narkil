@@ -28,6 +28,7 @@ class NarkilDatabase:
         self.tickets = self.db['tickets']
         self.quality = self.db['quality']
         self.customers = self.db['customers']
+        self.pattern_processes = self.db['pattern_processes']
 
     # --- Multi-Tenant Logic ---
     def get_companies(self):
@@ -124,6 +125,24 @@ class NarkilDatabase:
 
     def delete_customer(self, customer_id):
         return self.customers.delete_one({"_id": self._to_object_id(customer_id)})
+
+    # --- Pattern Process Management ---
+    def get_pattern_processes(self, company_id):
+        return list(self.pattern_processes.find({"company_id": self._to_object_id(company_id)}))
+
+    def save_pattern_process(self, company_id, process_data):
+        process_data["company_id"] = self._to_object_id(company_id)
+        process_data["updated_at"] = datetime.datetime.utcnow()
+        if "_id" in process_data:
+            pid = self._to_object_id(process_data.pop("_id"))
+            self.pattern_processes.update_one({"_id": pid}, {"$set": process_data})
+            return pid
+        else:
+            process_data["created_at"] = datetime.datetime.utcnow()
+            return self.pattern_processes.insert_one(process_data).inserted_id
+
+    def delete_pattern_process(self, process_id):
+        return self.pattern_processes.delete_one({"_id": self._to_object_id(process_id)})
 
     def seed(self):
         if self.companies.count_documents({}) == 0:
