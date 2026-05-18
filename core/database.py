@@ -27,6 +27,7 @@ class NarkilDatabase:
         self.production = self.db['production']
         self.tickets = self.db['tickets']
         self.quality = self.db['quality']
+        self.customers = self.db['customers']
 
     # --- Multi-Tenant Logic ---
     def get_companies(self):
@@ -106,6 +107,24 @@ class NarkilDatabase:
         return True, "User registered successfully."
 
     # --- Seed Data ---
+    # --- Customer Management ---
+    def get_customers(self, company_id):
+        return list(self.customers.find({"company_id": self._to_object_id(company_id)}))
+
+    def add_customer(self, company_id, customer_data):
+        customer_data["company_id"] = self._to_object_id(company_id)
+        customer_data["created_at"] = datetime.datetime.utcnow()
+        return self.customers.insert_one(customer_data).inserted_id
+
+    def update_customer(self, customer_id, customer_data):
+        return self.customers.update_one(
+            {"_id": self._to_object_id(customer_id)},
+            {"$set": customer_data}
+        )
+
+    def delete_customer(self, customer_id):
+        return self.customers.delete_one({"_id": self._to_object_id(customer_id)})
+
     def seed(self):
         if self.companies.count_documents({}) == 0:
             c_id = self.companies.insert_one({

@@ -129,9 +129,9 @@ QLabel#SectionLabel {
 
 /* ── Cards ────────────────────────────────────────────────────── */
 QFrame#Card {
-    background-color: #131324;
-    border: 1px solid #1c1c30;
-    border-radius: 14px;
+    background-color: rgba(26, 26, 48, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
 }
 
 QFrame#CardFire {
@@ -269,42 +269,42 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }
 /* ── Buttons ──────────────────────────────────────────────────── */
 QPushButton#ActionBtn {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-        stop:0 #cc3300, stop:0.5 #ff5500, stop:1 #ff8c00);
+        stop:0 #ff5722, stop:1 #ff8a65);
     color: white;
     border: none;
-    border-radius: 10px;
-    padding: 10px 24px;
-    font-size: 13px;
+    border-radius: 12px;
+    padding: 12px 28px;
+    font-size: 14px;
     font-weight: 700;
-    letter-spacing: 0.5px;
-    min-height: 36px;
+    letter-spacing: 0.8px;
+    min-height: 42px;
 }
 
 QPushButton#ActionBtn:hover {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-        stop:0 #dd4411, stop:0.5 #ff6600, stop:1 #ffa000);
+        stop:0 #ff7043, stop:1 #ffab91);
 }
 
 QPushButton#ActionBtn:pressed {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-        stop:0 #aa2200, stop:0.5 #dd4400, stop:1 #dd7700);
+        stop:0 #e64a19, stop:1 #ff7043);
 }
 
 QPushButton#SecondaryBtn {
-    background-color: #141430;
-    color: #8888b8;
-    border: 1px solid #242448;
-    border-radius: 10px;
+    background-color: rgba(255, 255, 255, 0.05);
+    color: #ff5722;
+    border: 1px solid rgba(255, 87, 34, 0.3);
+    border-radius: 12px;
     padding: 10px 22px;
     font-size: 13px;
     font-weight: 600;
-    min-height: 36px;
+    min-height: 40px;
 }
 
 QPushButton#SecondaryBtn:hover {
-    background-color: #1c1c3c;
-    color: #c0c0e0;
-    border-color: #ff5500;
+    background-color: rgba(255, 87, 34, 0.1);
+    color: #ff7043;
+    border-color: #ff5722;
 }
 
 QPushButton#DangerBtn {

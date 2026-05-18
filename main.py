@@ -42,6 +42,8 @@ from modules.orders import OrdersModule
 from modules.planning import PlanningModule
 from modules.quality import QualityModule
 from modules.ticketing import TicketingModule
+from modules.customers import CustomersModule
+from modules.calculator import CalculatorModule
 
 SMTP_CONFIG = {
     "Host": os.getenv("SMTP_HOST", "smtp.gmail.com"),
@@ -330,8 +332,8 @@ class NarkilSidebar(QWidget):
     # (category title, [(label, stack index), ...])
     CATEGORIES = [
         ("OVERVIEW",   [("Dashboard",  0)]),
-        ("OPERATIONS", [("Inventory",  1), ("Production", 2)]),
-        ("COMMERCE",   [("Orders",     3), ("Planning",   4)]),
+        ("OPERATIONS", [("Inventory",  1), ("Production", 2), ("Calculator", 7)]),
+        ("COMMERCE",   [("Orders",     3), ("Planning",   4), ("Customers", 8)]),
         ("CONTROL",    [("Quality",    5), ("Tickets",    6)]),
     ]
 
@@ -568,6 +570,8 @@ class NarkilMainWindow(QMainWindow):
         self.stack.addWidget(PlanningModule(self.db, self.company_id))
         self.stack.addWidget(QualityModule(self.db, self.company_id))
         self.stack.addWidget(TicketingModule(self.db, self.company_id, self.user))
+        self.stack.addWidget(CalculatorModule(self.db, self.company_id))
+        self.stack.addWidget(CustomersModule(self.db, self.company_id))
 
     def _on_page_changed(self, idx: int):
         self.stack.setCurrentIndex(idx)

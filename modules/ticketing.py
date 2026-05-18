@@ -64,6 +64,13 @@ class TicketDialog(QDialog):
         hdr.setStyleSheet("font-size: 12px; font-weight: 800; color: #f0f0f8; letter-spacing: 3px;")
         root.addWidget(hdr)
 
+        # Customer Selection
+        root.addWidget(self._lbl("CUSTOMER"))
+        self.customer_box = QComboBox()
+        self.customer_box.addItem("Internal / General", None)
+        # We will populate this from the module
+        root.addWidget(self.customer_box)
+
         # Ticket title
         root.addWidget(self._lbl("TICKET TITLE"))
         self.title_in = QLineEdit()
@@ -109,6 +116,8 @@ class TicketDialog(QDialog):
 
     def get_data(self):
         return {
+            "customer_id": self.customer_box.currentData(),
+            "customer_name": self.customer_box.currentText(),
             "title":    self.title_in.text().strip(),
             "priority": self.pri_box.currentText(),
             "desc":     self.desc_in.toPlainText().strip(),
@@ -166,6 +175,11 @@ class TicketingModule(QWidget):
 
     def add_ticket(self):
         d = TicketDialog(self)
+        # Populate customers
+        customers = self.db.get_customers(self.company_id)
+        for c in customers:
+            d.customer_box.addItem(c["name"], str(c["_id"]))
+            
         if d.exec():
             data = d.get_data()
             if data["title"]:
