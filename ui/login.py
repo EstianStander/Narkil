@@ -87,10 +87,12 @@ class ModernLoginView(QWidget):
         self.on_success = on_success
         self.otp = email_otp_service
         self.pending_login = None
+        self._bg_warned = False
         self.init_ui()
 
     def init_ui(self):
         self.setWindowTitle("Narkil ERP — Enterprise Access")
+        self.setMinimumSize(980, 680)
         
         # Main Layout
         self.main_layout = QVBoxLayout(self)
@@ -99,6 +101,7 @@ class ModernLoginView(QWidget):
         # Background
         self.bg = AnimatedBackground(self)
         self.bg.resize(self.size())
+        self.bg.lower()
         
         # Content Wrapper (Centered)
         self.content_wrapper = QWidget(self)
@@ -148,8 +151,6 @@ class ModernLoginView(QWidget):
             self.logo_label.setPixmap(pix.scaled(140, 140, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
         self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
-        # Apply a subtle drop shadow/glow effect to logo
-        self.logo_label.setStyleSheet("filter: drop-shadow(0 0 20px rgba(255, 87, 34, 0.5));")
         logo_layout.addWidget(self.logo_label)
         left_layout.addWidget(logo_container)
         left_layout.addSpacing(30)
@@ -216,9 +217,7 @@ class ModernLoginView(QWidget):
         self.wrapper_layout.addWidget(self.card)
         self.wrapper_layout.addStretch()
 
-        self.main_layout.addStretch()
-        self.main_layout.addLayout(self.wrapper_layout)
-        self.main_layout.addStretch()
+        self.main_layout.addWidget(self.content_wrapper, 1)
 
         # Stylesheet for inputs and buttons
         self.setStyleSheet("""

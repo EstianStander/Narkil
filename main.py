@@ -179,7 +179,15 @@ class LoginView(ModernLoginView):
 
     def refresh_company_boxes(self):
         boxes = [self.login_company_box, self.reg_user_company_box]
-        companies = self.db.get_companies()
+        try:
+            companies = self.db.get_companies()
+        except Exception as exc:
+            companies = []
+            QMessageBox.warning(
+                self,
+                "Database Connection",
+                f"Could not load companies yet. Check MONGODB_URI / network and try again.\n\n{exc}",
+            )
         for box in boxes:
             if box is None:
                 continue
@@ -591,12 +599,29 @@ if __name__ == "__main__":
         _main_ref[0] = mw
 
     def _on_splash_done():
-        db = NarkilDatabase()
-        db.seed()
-        _db_ref[0] = db
-        lv = LoginView(db, _launch_main)
-        lv.showMaximized()
-        _login_ref[0] = lv
+        try:
+            db = NarkilDatabase()
+            # Seed is helpful for first-run, but DB outages should not kill the UI startup.
+            try:
+                db.seed()
+            except Exception as exc:
+                QMessageBox.warning(
+                    None,
+                    "Database Warning",
+                    f"Connected UI startup, but initial database seed failed.\n\n{exc}",
+                )
+
+            _db_ref[0] = db
+            lv = LoginView(db, _launch_main)
+            lv.showMaximized()
+            _login_ref[0] = lv
+        except Exception as exc:
+            QMessageBox.critical(
+                None,
+                "Startup Error",
+                f"Narkil could not open the login page.\n\n{exc}",
+            )
+            app.quit()
 
     splash.start(_on_splash_done)
     sys.exit(app.exec())
