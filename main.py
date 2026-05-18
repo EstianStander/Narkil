@@ -4,6 +4,14 @@ import smtplib
 import secrets
 import datetime
 from email.message import EmailMessage
+
+# Load .env before any os.getenv calls
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv not installed; rely on environment variables already set
+
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QLabel, QLineEdit, QPushButton,
                              QComboBox, QStackedWidget, QMessageBox, QListWidget,
@@ -36,9 +44,9 @@ SMTP_CONFIG = {
     "Host": os.getenv("SMTP_HOST", "smtp.gmail.com"),
     "Port": int(os.getenv("SMTP_PORT", "587")),
     "Ssl": os.getenv("SMTP_SSL", "true").lower() == "true",
-    "User": os.getenv("SMTP_USER", "stormfoxstudio@gmail.com"),
+    "User": os.getenv("SMTP_USER", ""),
     "Pass": os.getenv("SMTP_PASS", ""),
-    "AdminEmail": os.getenv("SMTP_ADMIN_EMAIL", "stormfoxstudio@gmail.com")
+    "AdminEmail": os.getenv("SMTP_ADMIN_EMAIL", ""),
 }
 
 
@@ -109,7 +117,16 @@ class LoginView(QWidget):
 
     def init_ui(self):
         self.setWindowTitle("Narkil ERP — Secure Login")
-        self.setFixedSize(500, 760)
+        self.setMinimumSize(520, 720)
+
+        # Open at a comfortable fixed size, centred on screen
+        screen = QApplication.primaryScreen().availableGeometry()
+        w, h = 520, 800
+        self.setGeometry(
+            (screen.width() - w) // 2,
+            (screen.height() - h) // 2,
+            w, h,
+        )
 
         # ── Global stylesheet ──────────────────────────────────────────────
         self.setStyleSheet("""
@@ -185,12 +202,23 @@ class LoginView(QWidget):
         """)
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(20, 20, 20, 20)
+        outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
+
+        # Vertical centering
+        outer.addStretch(1)
+
+        h_row = QHBoxLayout()
+        h_row.setContentsMargins(0, 0, 0, 0)
+        h_row.setSpacing(0)
+
+        # Horizontal centering
+        h_row.addStretch(1)
 
         # ── Card ───────────────────────────────────────────────────────────
         card = QFrame()
         card.setObjectName("LoginCard")
+        card.setFixedWidth(468)
         card.setStyleSheet(
             "QFrame#LoginCard {"
             "  background-color: #111120;"
@@ -198,7 +226,11 @@ class LoginView(QWidget):
             "  border-radius: 14px;"
             "}"
         )
-        outer.addWidget(card)
+
+        h_row.addWidget(card)
+        h_row.addStretch(1)
+        outer.addLayout(h_row)
+        outer.addStretch(1)
 
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(42, 32, 42, 28)
@@ -689,8 +721,9 @@ class NarkilMainWindow(QMainWindow):
         self.init_ui()
 
     def init_ui(self):
-        self.setWindowTitle(f"NARKIL ERP | {self.user['username']}")
+        self.setWindowTitle(f"NARKIL ERP  ·  {self.user['username']}")
         self.setMinimumSize(1280, 800)
+        self.showMaximized()
         self.setStyleSheet(NARKIL_THEME)
 
         central = QWidget()
@@ -719,10 +752,37 @@ class NarkilMainWindow(QMainWindow):
         side_layout.addWidget(self.nav)
         
         side_layout.addStretch()
-        
-        user_info = QLabel(f"Logged in: {self.user['username']}")
-        user_info.setStyleSheet("color: #777; padding: 10px;")
-        side_layout.addWidget(user_info)
+
+        # ── User card at bottom of sidebar ────────────────────────────────
+        user_card = QFrame()
+        user_card.setStyleSheet(
+            "QFrame {"
+            "  background-color: #1a1a2e;"
+            "  border-top: 1px solid #252540;"
+            "  border-radius: 0px;"
+            "}"
+        )
+        uc_layout = QHBoxLayout(user_card)
+        uc_layout.setContentsMargins(20, 14, 20, 14)
+        uc_layout.setSpacing(12)
+
+        avatar = QLabel(self.user['username'][0].upper())
+        avatar.setFixedSize(36, 36)
+        avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        avatar.setStyleSheet(
+            "background: qlineargradient(x1:0, y1:0, x2:1, y2:1,"
+            "  stop:0 #c62828, stop:1 #ff5722);"
+            "color: white; font-size: 15px; font-weight: 700;"
+            "border-radius: 18px;"
+        )
+        uc_layout.addWidget(avatar)
+
+        name_lbl = QLabel(self.user['username'])
+        name_lbl.setStyleSheet("color: #c8c8e0; font-size: 13px; font-weight: 600;")
+        uc_layout.addWidget(name_lbl)
+        uc_layout.addStretch()
+
+        side_layout.addWidget(user_card)
 
         layout.addWidget(sidebar)
 
@@ -763,7 +823,9 @@ if __name__ == "__main__":
         if _login_ref[0]:
             _login_ref[0].close()
         mw = NarkilMainWindow(_db_ref[0], user, cid)
-        mw.show()
+        # showMaximized is already called inside init_ui; just ensure visible
+        if not mw.isVisible():
+            mw.showMaximized()
         _main_ref[0] = mw
 
     def _on_splash_done():
