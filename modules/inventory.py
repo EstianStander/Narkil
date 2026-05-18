@@ -1,7 +1,8 @@
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-                             QPushButton, QTableWidget, QTableWidgetItem, 
-                             QHeaderView, QFrame, QSplitter)
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+                             QPushButton, QTableWidget, QTableWidgetItem,
+                             QHeaderView, QFrame)
 from PyQt6.QtCore import Qt
+
 
 class InventoryModule(QWidget):
     def __init__(self, db, company_id):
@@ -12,63 +13,88 @@ class InventoryModule(QWidget):
 
     def init_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(32, 28, 32, 24)
+        layout.setSpacing(24)
 
-        # Header
-        header = QHBoxLayout()
-        title = QLabel("Inventory & Material Management")
-        title.setStyleSheet("font-size: 24px; font-weight: bold; color: #ff5722;")
-        header.addWidget(title)
-        header.addStretch()
-        
+        # ── Page header ───────────────────────────────────────────────────
+        header_row = QHBoxLayout()
+        title_block = QVBoxLayout()
+        title_block.setSpacing(4)
+        title = QLabel("Inventory & Materials")
+        title.setObjectName("PageTitle")
+        sub = QLabel("Track raw materials, alloys, and finished goods")
+        sub.setObjectName("PageSubtitle")
+        title_block.addWidget(title)
+        title_block.addWidget(sub)
+        header_row.addLayout(title_block)
+        header_row.addStretch()
+
         add_btn = QPushButton("+ Add Stock")
         add_btn.setObjectName("ActionBtn")
-        header.addWidget(add_btn)
-        layout.addLayout(header)
+        add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        header_row.addWidget(add_btn)
+        layout.addLayout(header_row)
 
-        # Main Content with Splitter
-        splitter = QSplitter(Qt.Orientation.Vertical)
+        # ── Stat cards ────────────────────────────────────────────────────
+        cards_row = QHBoxLayout()
+        cards_row.setSpacing(16)
+        cards_row.addWidget(self._stat_card("Raw Materials", "450 Tons",  "CardFire"))
+        cards_row.addWidget(self._stat_card("Alloys",        "12 Tons",   "CardAmber"))
+        cards_row.addWidget(self._stat_card("Finished Goods","1,240 Units","CardGold"))
+        cards_row.addWidget(self._stat_card("Low Stock Alerts", "3",      "CardRed"))
+        layout.addLayout(cards_row)
 
-        # Summary Cards
-        summary_frame = QFrame()
-        summary_layout = QHBoxLayout(summary_frame)
-        summary_layout.addWidget(self.create_stat_card("Raw Materials", "450 Tons"))
-        summary_layout.addWidget(self.create_stat_card("Alloys", "12 Tons"))
-        summary_layout.addWidget(self.create_stat_card("Finished Castings", "1,240 Units"))
-        summary_layout.addWidget(self.create_stat_card("Low Stock Alerts", "3", "#e74c3c"))
-        splitter.addWidget(summary_frame)
-
-        # Inventory Table
+        # ── Inventory table ───────────────────────────────────────────────
         self.table = QTableWidget()
         self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["Item Name", "Category", "Quantity", "Unit", "Last Updated"])
+        self.table.setHorizontalHeaderLabels(
+            ["Item Name", "Category", "Quantity", "Unit", "Last Updated"]
+        )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        splitter.addWidget(self.table)
+        self.table.verticalHeader().setVisible(False)
+        self.table.setShowGrid(False)
+        self.table.setAlternatingRowColors(True)
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        layout.addWidget(self.table, 1)
 
-        layout.addWidget(splitter)
         self.load_data()
 
-    def create_stat_card(self, title, value, color="#ff5722"):
+    def _stat_card(self, title, value, card_name="CardFire"):
         card = QFrame()
-        card.setStyleSheet(f"background-color: #252525; border-radius: 8px; border: 1px solid #333; padding: 15px;")
-        l = QVBoxLayout(card)
-        t = QLabel(title)
-        t.setStyleSheet("color: #888; font-size: 12px;")
+        card.setObjectName(card_name)
+        card.setMinimumHeight(90)
+        lay = QVBoxLayout(card)
+        lay.setContentsMargins(20, 16, 20, 16)
+        lay.setSpacing(6)
+
+        t = QLabel(title.upper())
+        t.setStyleSheet("font-size: 10px; color: #55557a; font-weight: 700; letter-spacing: 1.5px;")
+
+        colors = {"CardFire": "#ff5500", "CardAmber": "#ff8c00",
+                  "CardGold": "#ffbb00", "CardRed": "#ff3050"}
         v = QLabel(value)
-        v.setStyleSheet(f"color: {color}; font-size: 20px; font-weight: bold;")
-        l.addWidget(t)
-        l.addWidget(v)
+        v.setStyleSheet(f"font-size: 22px; color: {colors.get(card_name,'#ff5500')}; font-weight: 800;")
+
+        lay.addWidget(t)
+        lay.addWidget(v)
+        lay.addStretch()
         return card
 
     def load_data(self):
-        # Mock data for now
         data = [
-            ("Scrap Iron", "Raw Material", "320", "Tons", "2026-05-18"),
-            ("Ferro-Silicon", "Alloy", "1.5", "Tons", "2026-05-17"),
-            ("Bentonite", "Sand Additive", "500", "Kg", "2026-05-18"),
-            ("Engine Block #X1", "Finished Goods", "45", "Units", "2026-05-16"),
+            ("Scrap Iron",      "Raw Material",  "320",  "Tons",  "2026-05-18"),
+            ("Ferro-Silicon",   "Alloy",         "1.5",  "Tons",  "2026-05-17"),
+            ("Bentonite",       "Sand Additive", "500",  "Kg",    "2026-05-18"),
+            ("Engine Block #X1","Finished Goods","45",   "Units", "2026-05-16"),
+            ("Coke",            "Fuel",          "12",   "Tons",  "2026-05-15"),
         ]
         self.table.setRowCount(len(data))
         for i, row in enumerate(data):
             for j, val in enumerate(row):
-                self.table.setItem(i, j, QTableWidgetItem(val))
+                item = QTableWidgetItem(val)
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                self.table.setItem(i, j, item)
+        self.table.setRowHeight(0, 48)
+        for i in range(self.table.rowCount()):
+            self.table.setRowHeight(i, 48)
+

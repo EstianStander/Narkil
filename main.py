@@ -1,5 +1,7 @@
 import sys
 import os
+import json
+import base64
 import smtplib
 import secrets
 import datetime
@@ -14,9 +16,9 @@ except ImportError:
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QLabel, QLineEdit, QPushButton,
-                             QComboBox, QStackedWidget, QMessageBox, QListWidget,
-                             QFrame, QScrollArea, QCheckBox)
-from PyQt6.QtCore import Qt, QSize
+                             QComboBox, QStackedWidget, QMessageBox,
+                             QFrame, QScrollArea, QCheckBox, QSizePolicy)
+from PyQt6.QtCore import Qt, QSize, pyqtSignal
 from PyQt6.QtGui import QPixmap, QIcon
 from core.database import NarkilDatabase
 from ui.styles import NARKIL_THEME
@@ -106,6 +108,50 @@ class EmailOtpService:
         return True, "OTP verified."
 
 
+# ── Session persistence (Remember Me) ────────────────────────────────────────
+
+def _session_path() -> str:
+    app_data = os.getenv("APPDATA") or os.path.expanduser("~")
+    session_dir = os.path.join(app_data, "Narkil")
+    os.makedirs(session_dir, exist_ok=True)
+    return os.path.join(session_dir, "session.json")
+
+
+def _save_session(company_id, email: str, password: str) -> None:
+    data = {
+        "company_id": str(company_id),
+        "email": email,
+        "password": base64.b64encode(password.encode()).decode(),
+    }
+    try:
+        with open(_session_path(), "w") as f:
+            json.dump(data, f)
+    except OSError:
+        pass
+
+
+def _load_session() -> dict | None:
+    path = _session_path()
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path) as f:
+            data = json.load(f)
+        data["password"] = base64.b64decode(data["password"].encode()).decode()
+        return data
+    except Exception:
+        return None
+
+
+def _clear_session() -> None:
+    try:
+        path = _session_path()
+        if os.path.exists(path):
+            os.remove(path)
+    except OSError:
+        pass
+
+
 class LoginView(QWidget):
     def __init__(self, db, on_success):
         super().__init__()
@@ -114,6 +160,19 @@ class LoginView(QWidget):
         self.otp = EmailOtpService(SMTP_CONFIG)
         self.pending_login = None
         self.init_ui()
+        self._restore_session()
+
+    def _restore_session(self):
+        session = _load_session()
+        if not session:
+            return
+        self.login_remember_me.setChecked(True)
+        for i in range(self.login_company_box.count()):
+            if str(self.login_company_box.itemData(i)) == session.get("company_id", ""):
+                self.login_company_box.setCurrentIndex(i)
+                break
+        self.login_email_in.setText(session.get("email", ""))
+        self.login_pass_in.setText(session.get("password", ""))
 
     def init_ui(self):
         self.setWindowTitle("Narkil ERP — Secure Login")
@@ -131,34 +190,34 @@ class LoginView(QWidget):
         # ── Global stylesheet ──────────────────────────────────────────────
         self.setStyleSheet("""
             QWidget {
-                background-color: #0a0a14;
-                color: #c8c8e0;
+                background-color: #0e0e1e;
+                color: #d5d5ee;
                 font-family: 'Segoe UI', Arial, sans-serif;
             }
             QLabel { background: transparent; }
             QLineEdit {
-                background-color: #181828;
-                border: 1.5px solid #252542;
+                background-color: #20203a;
+                border: 1.5px solid #363660;
                 border-radius: 8px;
                 padding: 11px 14px;
-                color: #c8c8e0;
+                color: #d5d5ee;
                 font-size: 13px;
             }
             QLineEdit:focus {
                 border-color: #ff5722;
-                background-color: #1c1c30;
+                background-color: #262646;
             }
             QComboBox {
-                background-color: #181828;
-                border: 1.5px solid #252542;
+                background-color: #20203a;
+                border: 1.5px solid #363660;
                 border-radius: 8px;
                 padding: 11px 14px;
-                color: #c8c8e0;
+                color: #d5d5ee;
                 font-size: 13px;
             }
             QComboBox:focus {
                 border-color: #ff5722;
-                background-color: #1c1c30;
+                background-color: #262646;
             }
             QComboBox::drop-down { border: none; width: 30px; }
             QComboBox::down-arrow {
@@ -168,16 +227,16 @@ class LoginView(QWidget):
                 margin-right: 10px;
             }
             QComboBox QAbstractItemView {
-                background-color: #181828;
-                border: 1px solid #252542;
-                color: #c8c8e0;
+                background-color: #20203a;
+                border: 1px solid #363660;
+                color: #d5d5ee;
                 selection-background-color: #ff5722;
                 selection-color: white;
                 outline: none;
             }
             QScrollArea { border: none; background: transparent; }
             QScrollBar:vertical {
-                background: #111122;
+                background: #1a1a35;
                 width: 5px;
                 border-radius: 2px;
                 margin: 0;
@@ -188,12 +247,12 @@ class LoginView(QWidget):
                 min-height: 20px;
             }
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
-            QCheckBox { color: #6a6a8c; font-size: 12px; spacing: 8px; }
+            QCheckBox { color: #9090b0; font-size: 12px; spacing: 8px; }
             QCheckBox::indicator {
                 width: 15px; height: 15px;
-                border: 1.5px solid #252542;
+                border: 1.5px solid #363660;
                 border-radius: 4px;
-                background-color: #181828;
+                background-color: #20203a;
             }
             QCheckBox::indicator:checked {
                 background-color: #ff5722;
@@ -221,8 +280,8 @@ class LoginView(QWidget):
         card.setFixedWidth(468)
         card.setStyleSheet(
             "QFrame#LoginCard {"
-            "  background-color: #111120;"
-            "  border: 1px solid #1c1c34;"
+            "  background-color: #1a1a30;"
+            "  border: 1px solid #3a3a5e;"
             "  border-radius: 14px;"
             "}"
         )
@@ -260,7 +319,7 @@ class LoginView(QWidget):
 
         subtitle = QLabel("ENTERPRISE RESOURCE PLANNING")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        subtitle.setStyleSheet("color: #2c2c48; font-size: 9px; letter-spacing: 4px;")
+        subtitle.setStyleSheet("color: #6868a8; font-size: 9px; letter-spacing: 4px;")
         card_layout.addWidget(subtitle)
         card_layout.addSpacing(20)
 
@@ -270,7 +329,7 @@ class LoginView(QWidget):
         divider.setFixedHeight(1)
         divider.setStyleSheet(
             "background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
-            "stop:0 transparent, stop:0.3 #222242, stop:0.7 #222242, stop:1 transparent);"
+            "stop:0 transparent, stop:0.3 #3a3a5e, stop:0.7 #3a3a5e, stop:1 transparent);"
             "border: none;"
         )
         card_layout.addWidget(divider)
@@ -286,11 +345,11 @@ class LoginView(QWidget):
         )
         self._STYLE_TAB_IDLE = (
             "QPushButton {"
-            "  background: transparent; color: #36365a; border: none;"
+            "  background: transparent; color: #7070a8; border: none;"
             "  border-bottom: 2px solid transparent;"
             "  padding: 8px 22px; font-size: 11px; font-weight: 700; letter-spacing: 2px;"
             "}"
-            "QPushButton:hover { color: #5a5a84; }"
+            "QPushButton:hover { color: #9898c8; }"
         )
 
         tab_bar = QWidget()
@@ -326,7 +385,7 @@ class LoginView(QWidget):
         card_layout.addSpacing(12)
         footer = QLabel("© 2025 Narkil ERP  ·  v1.0.0")
         footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        footer.setStyleSheet("color: #1c1c34; font-size: 9px; letter-spacing: 1px;")
+        footer.setStyleSheet("color: #646488; font-size: 9px; letter-spacing: 1px;")
         card_layout.addWidget(footer)
 
     def _switch_tab(self, idx):
@@ -348,7 +407,7 @@ class LoginView(QWidget):
         def _lbl(text):
             l = QLabel(text)
             l.setStyleSheet(
-                "color: #44446c; font-size: 10px; font-weight: 600;"
+                "color: #9898c0; font-size: 10px; font-weight: 600;"
                 "letter-spacing: 1px; margin-bottom: 4px;"
             )
             return l
@@ -371,27 +430,10 @@ class LoginView(QWidget):
         self.login_pass_in.setPlaceholderText("Enter your password")
         self.login_pass_in.setEchoMode(QLineEdit.EchoMode.Password)
         layout.addWidget(self.login_pass_in)
-        layout.addSpacing(10)
+        layout.addSpacing(12)
 
-        layout.addWidget(_lbl("VERIFICATION CODE"))
-        self.login_otp_in = QLineEdit()
-        self.login_otp_in.setPlaceholderText("6-digit OTP code")
-        self.login_otp_in.setMaxLength(6)
-        layout.addWidget(self.login_otp_in)
-        layout.addSpacing(6)
-
-        send_otp_btn = QPushButton("Send verification code  →")
-        send_otp_btn.setStyleSheet(
-            "QPushButton {"
-            "  background: transparent; color: #ff5722; border: none;"
-            "  font-size: 11px; font-weight: 600; letter-spacing: 0px;"
-            "  padding: 2px 0px; text-align: left;"
-            "}"
-            "QPushButton:hover { color: #ffa726; }"
-        )
-        send_otp_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        send_otp_btn.clicked.connect(self.request_login_otp)
-        layout.addWidget(send_otp_btn)
+        self.login_remember_me = QCheckBox("Remember me")
+        layout.addWidget(self.login_remember_me)
         layout.addSpacing(18)
 
         login_btn = QPushButton("ENTER SYSTEM")
@@ -433,7 +475,7 @@ class LoginView(QWidget):
         def _lbl(text):
             l = QLabel(text)
             l.setStyleSheet(
-                "color: #44446c; font-size: 10px; font-weight: 600;"
+                "color: #9898c0; font-size: 10px; font-weight: 600;"
                 "letter-spacing: 1px; margin-bottom: 4px;"
             )
             return l
@@ -451,12 +493,12 @@ class LoginView(QWidget):
             btn.setFixedHeight(38)
             btn.setStyleSheet(
                 "QPushButton {"
-                "  background-color: #1a1a2e; color: #6a6a90;"
-                "  border: 1px solid #282848; border-radius: 7px;"
+                "  background-color: #22223e; color: #8888b0;"
+                "  border: 1px solid #383860; border-radius: 7px;"
                 "  font-size: 11px; font-weight: 600; letter-spacing: 1px;"
                 "}"
                 "QPushButton:hover {"
-                "  background-color: #202038; color: #c0c0e0; border-color: #ff5722;"
+                "  background-color: #2c2c50; color: #d0d0ee; border-color: #ff5722;"
                 "}"
             )
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -525,7 +567,7 @@ class LoginView(QWidget):
         sep.setFixedHeight(1)
         sep.setStyleSheet(
             "background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
-            "stop:0 transparent, stop:0.3 #1e1e38, stop:0.7 #1e1e38, stop:1 transparent);"
+            "stop:0 transparent, stop:0.3 #3a3a5e, stop:0.7 #3a3a5e, stop:1 transparent);"
             "border: none;"
         )
         layout.addWidget(sep)
@@ -626,21 +668,20 @@ class LoginView(QWidget):
         company_id = self.login_company_box.currentData()
         email = self.login_email_in.text().strip().lower()
         password = self.login_pass_in.text()
-        otp_code = self.login_otp_in.text().strip()
+
+        if not company_id or not email or not password:
+            QMessageBox.warning(self, "Missing Data", "Please fill in all fields.")
+            return
 
         user = self.db.authenticate(email, password, company_id)
         if not user:
             QMessageBox.critical(self, "Access Denied", "Invalid credentials for this foundry.")
             return
 
-        if user.get("two_factor_enabled", True):
-            if not self.pending_login or self.pending_login.get("email") != email or self.pending_login.get("company_id") != company_id:
-                QMessageBox.warning(self, "OTP Required", "Click 'Send Login OTP' first.")
-                return
-            ok, msg = self.otp.verify_otp(email, "login", otp_code)
-            if not ok:
-                QMessageBox.critical(self, "OTP Error", msg)
-                return
+        if self.login_remember_me.isChecked():
+            _save_session(company_id, email, password)
+        else:
+            _clear_session()
 
         self.on_success(user, company_id)
 
@@ -712,6 +753,213 @@ class LoginView(QWidget):
         else:
             QMessageBox.critical(self, "Registration Error", create_msg)
 
+
+
+# ── Collapsible categorised sidebar ──────────────────────────────────────────
+
+class NarkilSidebar(QWidget):
+    """Premium collapsible sidebar with category groups and fire-brand styling."""
+
+    page_changed = pyqtSignal(int)
+
+    # (category title, [(label, stack index), ...])
+    CATEGORIES = [
+        ("OVERVIEW",   [("Dashboard",  0)]),
+        ("OPERATIONS", [("Inventory",  1), ("Production", 2)]),
+        ("COMMERCE",   [("Orders",     3), ("Planning",   4)]),
+        ("CONTROL",    [("Quality",    5), ("Tickets",    6)]),
+    ]
+
+    _NAV_ACTIVE = (
+        "QPushButton {"
+        "  background: rgba(255,85,0,0.11);"
+        "  color: #ff6622;"
+        "  border: none;"
+        "  border-left: 3px solid #ff5500;"
+        "  border-top-right-radius: 9px;"
+        "  border-bottom-right-radius: 9px;"
+        "  padding: 10px 16px 10px 20px;"
+        "  font-size: 13px;"
+        "  font-weight: 600;"
+        "  text-align: left;"
+        "}"
+    )
+    _NAV_IDLE = (
+        "QPushButton {"
+        "  background: transparent;"
+        "  color: #606088;"
+        "  border: none;"
+        "  border-left: 3px solid transparent;"
+        "  border-top-right-radius: 9px;"
+        "  border-bottom-right-radius: 9px;"
+        "  padding: 10px 16px 10px 20px;"
+        "  font-size: 13px;"
+        "  font-weight: 500;"
+        "  text-align: left;"
+        "}"
+        "QPushButton:hover {"
+        "  background: rgba(255,255,255,0.04);"
+        "  color: #9898c0;"
+        "}"
+    )
+    _CAT_HDR = (
+        "QPushButton {"
+        "  background: transparent;"
+        "  color: #38386a;"
+        "  border: none;"
+        "  padding: 10px 16px 4px 12px;"
+        "  font-size: 9px;"
+        "  font-weight: 800;"
+        "  letter-spacing: 2.5px;"
+        "  text-align: left;"
+        "}"
+        "QPushButton:hover { color: #6060a0; }"
+    )
+
+    def __init__(self, db, user, parent=None):
+        super().__init__(parent)
+        self.db = db
+        self.user = user
+        self._nav_btns: dict[int, QPushButton] = {}
+        self._current = -1
+        self._build()
+
+    # ── Build ─────────────────────────────────────────────────────────────
+
+    def _build(self):
+        self.setObjectName("Sidebar")
+        self.setFixedWidth(256)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        root.addWidget(self._build_header())
+        root.addWidget(self._build_nav(), 1)
+        root.addWidget(self._build_user_card())
+
+    def _build_header(self):
+        w = QWidget()
+        w.setObjectName("SidebarHeader")
+        w.setFixedHeight(84)
+        lay = QHBoxLayout(w)
+        lay.setContentsMargins(16, 0, 16, 0)
+        lay.setSpacing(12)
+
+        logo_lbl = QLabel()
+        pix = QPixmap(resource_path("assets/logo.png"))
+        if not pix.isNull():
+            logo_lbl.setPixmap(
+                pix.scaled(46, 46, Qt.AspectRatioMode.KeepAspectRatio,
+                           Qt.TransformationMode.SmoothTransformation)
+            )
+        lay.addWidget(logo_lbl)
+
+        txt = QVBoxLayout()
+        txt.setSpacing(3)
+        name_lbl = QLabel("NARKIL")
+        name_lbl.setObjectName("SidebarAppName")
+        sub_lbl = QLabel("ERP PLATFORM")
+        sub_lbl.setObjectName("SidebarSubtitle")
+        txt.addWidget(name_lbl)
+        txt.addWidget(sub_lbl)
+        lay.addLayout(txt)
+        lay.addStretch()
+        return w
+
+    def _build_nav(self):
+        scroll = QScrollArea()
+        scroll.setObjectName("SidebarScroll")
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+
+        wrap = QWidget()
+        wrap.setObjectName("NavContainer")
+        wl = QVBoxLayout(wrap)
+        wl.setContentsMargins(0, 10, 0, 10)
+        wl.setSpacing(0)
+
+        for cat_title, items in self.CATEGORIES:
+            self._add_category(wl, cat_title, items)
+
+        wl.addStretch()
+        scroll.setWidget(wrap)
+        return scroll
+
+    def _add_category(self, parent_layout, title, items):
+        parent_layout.addSpacing(6)
+
+        cat_btn = QPushButton(f"\u25be  {title}")
+        cat_btn.setStyleSheet(self._CAT_HDR)
+        cat_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        cat_btn.setFixedHeight(28)
+        parent_layout.addWidget(cat_btn)
+
+        items_wrap = QWidget()
+        iw = QVBoxLayout(items_wrap)
+        iw.setContentsMargins(0, 2, 8, 4)
+        iw.setSpacing(2)
+
+        for label, page_idx in items:
+            btn = QPushButton(f"   {label}")
+            btn.setStyleSheet(self._NAV_IDLE)
+            btn.setFixedHeight(40)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.clicked.connect(lambda _checked, i=page_idx: self.navigate(i))
+            self._nav_btns[page_idx] = btn
+            iw.addWidget(btn)
+
+        parent_layout.addWidget(items_wrap)
+
+        def _toggle():
+            expanded = items_wrap.isVisible()
+            items_wrap.setVisible(not expanded)
+            cat_btn.setText(f"{'▸' if expanded else '▾'}  {title}")
+
+        cat_btn.clicked.connect(_toggle)
+
+    def _build_user_card(self):
+        card = QWidget()
+        card.setObjectName("UserCard")
+        card.setFixedHeight(66)
+        lay = QHBoxLayout(card)
+        lay.setContentsMargins(16, 12, 16, 12)
+        lay.setSpacing(12)
+
+        initial = self.user.get("username", "U")[0].upper()
+        avatar = QLabel(initial)
+        avatar.setObjectName("UserAvatar")
+        avatar.setFixedSize(36, 36)
+        avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lay.addWidget(avatar)
+
+        info = QVBoxLayout()
+        info.setSpacing(2)
+        uname = QLabel(self.user.get("username", "User"))
+        uname.setObjectName("UserName")
+        urole = QLabel("Operator")
+        urole.setObjectName("UserRole")
+        info.addWidget(uname)
+        info.addWidget(urole)
+        lay.addLayout(info)
+        lay.addStretch()
+        return card
+
+    # ── Navigation ────────────────────────────────────────────────────────
+
+    def navigate(self, idx: int):
+        if self._current in self._nav_btns:
+            self._nav_btns[self._current].setStyleSheet(self._NAV_IDLE)
+        self._current = idx
+        if idx in self._nav_btns:
+            self._nav_btns[idx].setStyleSheet(self._NAV_ACTIVE)
+        self.page_changed.emit(idx)
+
+    def set_page(self, idx: int):
+        self.navigate(idx)
+
+
 class NarkilMainWindow(QMainWindow):
     def __init__(self, db, user, company_id):
         super().__init__()
@@ -721,80 +969,33 @@ class NarkilMainWindow(QMainWindow):
         self.init_ui()
 
     def init_ui(self):
-        self.setWindowTitle(f"NARKIL ERP  ·  {self.user['username']}")
+        self.setWindowTitle(f"NARKIL ERP  \u00b7  {self.user['username']}")
         self.setMinimumSize(1280, 800)
         self.showMaximized()
         self.setStyleSheet(NARKIL_THEME)
 
         central = QWidget()
+        central.setObjectName("ContentArea")
         self.setCentralWidget(central)
+
         layout = QHBoxLayout(central)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Sidebar
-        sidebar = QWidget()
-        sidebar.setObjectName("Sidebar")
-        sidebar.setFixedWidth(280)
-        side_layout = QVBoxLayout(sidebar)
-        
-        logo = QLabel()
-        logo.setPixmap(QPixmap(resource_path("assets/logo.png")).scaled(120, 120, Qt.AspectRatioMode.KeepAspectRatio))
-        logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        logo.setObjectName("SidebarLogo")
-        side_layout.addWidget(logo)
+        # ── Sidebar ───────────────────────────────────────────────────────
+        self.sidebar = NarkilSidebar(self.db, self.user)
+        self.sidebar.page_changed.connect(self._on_page_changed)
+        layout.addWidget(self.sidebar)
 
-        self.nav = QListWidget()
-        self.nav.setObjectName("NavList")
-        modules = ["Dashboard", "Inventory", "Production", "Orders", "Planning", "Quality", "Tickets"]
-        self.nav.addItems(modules)
-        self.nav.currentRowChanged.connect(self.switch_page)
-        side_layout.addWidget(self.nav)
-        
-        side_layout.addStretch()
-
-        # ── User card at bottom of sidebar ────────────────────────────────
-        user_card = QFrame()
-        user_card.setStyleSheet(
-            "QFrame {"
-            "  background-color: #1a1a2e;"
-            "  border-top: 1px solid #252540;"
-            "  border-radius: 0px;"
-            "}"
-        )
-        uc_layout = QHBoxLayout(user_card)
-        uc_layout.setContentsMargins(20, 14, 20, 14)
-        uc_layout.setSpacing(12)
-
-        avatar = QLabel(self.user['username'][0].upper())
-        avatar.setFixedSize(36, 36)
-        avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        avatar.setStyleSheet(
-            "background: qlineargradient(x1:0, y1:0, x2:1, y2:1,"
-            "  stop:0 #c62828, stop:1 #ff5722);"
-            "color: white; font-size: 15px; font-weight: 700;"
-            "border-radius: 18px;"
-        )
-        uc_layout.addWidget(avatar)
-
-        name_lbl = QLabel(self.user['username'])
-        name_lbl.setStyleSheet("color: #c8c8e0; font-size: 13px; font-weight: 600;")
-        uc_layout.addWidget(name_lbl)
-        uc_layout.addStretch()
-
-        side_layout.addWidget(user_card)
-
-        layout.addWidget(sidebar)
-
-        # Content
+        # ── Content stack ─────────────────────────────────────────────────
         self.stack = QStackedWidget()
-        layout.addWidget(self.stack)
-        
+        self.stack.setObjectName("ContentArea")
+        layout.addWidget(self.stack, 1)
+
         self.create_modules()
-        self.nav.setCurrentRow(0)
+        self.sidebar.set_page(0)
 
     def create_modules(self):
-        # All modules integrated into the stack
         self.stack.addWidget(DashboardModule(self.db, self.company_id))
         self.stack.addWidget(InventoryModule(self.db, self.company_id))
         self.stack.addWidget(ProductionModule(self.db, self.company_id))
@@ -803,8 +1004,12 @@ class NarkilMainWindow(QMainWindow):
         self.stack.addWidget(QualityModule(self.db, self.company_id))
         self.stack.addWidget(TicketingModule(self.db, self.company_id, self.user))
 
-    def switch_page(self, idx):
+    def _on_page_changed(self, idx: int):
         self.stack.setCurrentIndex(idx)
+
+    # kept for backwards compatibility
+    def switch_page(self, idx: int):
+        self._on_page_changed(idx)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
